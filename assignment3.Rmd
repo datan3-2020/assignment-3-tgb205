@@ -1,7 +1,7 @@
 ---
 title: "Statistical assignment 3"
-author: "[add your name here] [add your candidate number here - mandatory]"
-date: "[add date here]"
+author: "[Toby Baines] [670030310]"
+date: "[13/02/20]"
 output: github_document
 ---
 
@@ -30,10 +30,10 @@ library(data.table)
 # data.table is faster compared to readr so we'll use it in this case (the function fread()). You need to install this package first to be able to run this code.
 
 # create a vector with the file names and paths
-
+getwd()
 files <- dir(
              # Select the folder where the files are stored.
-             "[add your path here]",
+             "/Users/user/assignment-3-tgb205/UKDA-6614-tab/tab",
              # Tell R which pattern you want present in the files it will display.
              pattern = "indresp",
              # We want this process to repeat through the entire folder.
@@ -74,7 +74,10 @@ Now we have got the data from all 7 waves in the same data frame **all7** in the
 
 ```{r}
 Long <- all7 %>%
-  ...
+  pivot_longer(a_memorig:g_vote6, names_to = "variable", values_to = "value") %>%
+  separate(variable, into = c("wave", "variable"), sep = "_", extra = "merge") %>%
+  pivot_wider(names_from = variable, values_from = value)
+  
 Long
 ```
 
@@ -84,15 +87,20 @@ Now we want to filter the data keeping only respondents from the original UKHLS 
 
 ```{r}
 Long <- Long %>%
-        filter(...) %>%
-        mutate(sex_dv = ...) %>%
-        mutate(vote6 = ...)
+        filter(memorig==1) %>%
+        mutate(sex_dv = ifelse(sex_dv == 2, "female",
+                               ifelse(sex_dv == 1, "male", NA)))
+Long <- Long %>%
+   mutate(vote6 = recode(vote6,
+                         '1' = 1,
+                         '2' = 2,
+                         '3' = 3,
+                         '4' = 4,
+                         .default = NA_real_
+))
+table(Long$vote6)
 
-Long %>%
-        ...
-Long %>%
-        ...
-
+table(Long$sex_dv)
 ```
 
 ## Calculate mean political interest by sex and wave (10 points)
@@ -101,8 +109,11 @@ Political interest is an ordinal variable, but we will treat it as interval and 
 
 ```{r}
 meanVote6 <- Long %>%
-        ...
-        
+  group_by(wave, sex_dv) %>%
+  summarise(
+    meanVote6 = mean(vote6, na.rm = TRUE)
+  )%>%
+  na.omit()
 meanVote6
 ```
 
@@ -121,8 +132,13 @@ Write a short interpretation of your findings.
 
 ```{r}
 meanVote6 %>%
-        ...
+  pivot_wider(names_from = wave, values_from = meanVote6)
 ```
+According to the understanding society codebook, a mean closer to 4 implies 'not interested at all' in politics, whereas a mean close to 1 indicates a high level of interest in politics.
+
+Looking at men compared to women, men generally have a lower mean across waves which would indicate a higher level of political interest than women. Despite this both genders, on the whole, remain inbetween the 'fairly interest' to 'not very interested' categories.
+
+Moving from a-g (g being more recently), there appears to be an increase in political interest for both men and women. f represents the period 2014-15 and g represents 2015-2016. This is a period marked by a rise in populism across not only Britain but the world. Populism engages with a wider aspect of the population, with events such as Brexit and the election of Donald Trump the results. This is likely the cause of an increase in political interest. 
 
 ## Estimate stability of political interest (30 points)
 
@@ -147,6 +163,34 @@ Write the R code that does the following.
 5. Write a short interpretation of your findings.
 
 ```{r}
-...
+Polstab <- Long
+Polstab <- Polstab  %>% 
+  group_by(pidp) %>%
+  filter(!is.na(vote6)) %>%
+  mutate(delta = order_by(wave, vote6 - lag(vote6))) %>%
+  mutate(delta = ifelse(is.na(delta), 0, delta)) %>% 
+  filter(n()>= 7) 
+  
+Polstab$delta<-abs(Polstab$delta)
+
+Polstab<- Polstab %>%
+  group_by(pidp) %>%
+  mutate(
+    sumdelta = sum(delta)
+  )
+
+Polstab
+
+avPolStabgen <- tapply(Polstab$sumdelta, Polstab$sex_dv, mean, na.rm=TRUE )
+avPolStabgen
 
 ```
+```{r}
+avPolStabage <- Polstab %>%
+  filter(wave=="a")%>%
+  group_by(age_dv) %>%
+  summarise(sumdelta = mean(sumdelta, na.rm=TRUE))
+avPolStabage
+```
+## I did not know how to complete the exercise 
+
